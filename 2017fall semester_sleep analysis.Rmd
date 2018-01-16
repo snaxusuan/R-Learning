@@ -1,0 +1,117 @@
+---
+title: "2017fall semester_sleep analysis"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+For the past 85 days, I recorded when I went to bed and when I woke up. I then wanna use R to extract my own sleeping pattern from these data. This is just I play around with my data for fun. 
+
+The way I recorded it causes many data problems and I need to fix them first. (For example, 8:00 recorded as 20:00; use Chinese ":" instead of English one ":")
+
+```{r}
+setwd("/Users/susan/Columbia/生活相关/Self-management")
+
+if(!require(data.table)){install.packages(data.table)}
+library(data.table)
+
+sleep_data <- fread("2017fall学期睡眠分析 raw data.csv", na.strings = "")
+colnames(sleep_data) <- c("week","date","bed","wake_up")
+sleep_data <- sleep_data[complete.cases(sleep_data),]
+```
+
+###data cleaning 
+```{r}
+sleep_data$bed <- sub(pattern = "：", replacement = ":", x = sleep_data$bed)
+sleep_data$wake_up <- sub(pattern = "：", replacement = ":", x = sleep_data$wake_up)
+
+for (i in 6:11){
+        y = i+12
+        sleep_data$bed <- sub(pattern = paste(".*",i,":",sep=""), replacement = paste(y,":",sep=""), x = sleep_data$bed)
+        
+}
+sleep_data$bed <- sub(pattern = paste(".*","12",":",sep=""), replacement = paste("0",":",sep=""), x = sleep_data$bed)
+
+for (i in 16:23){
+        y = i-12
+        sleep_data$wake_up <- sub(pattern = paste(".*",i,":",sep=""), replacement = paste(y,":",sep=""), x = sleep_data$wake_up)
+        
+}
+sleep_data$wake_up <- sub(pattern = paste(".*","24",":",sep=""), replacement = paste("12",":",sep=""), x = sleep_data$wake_up)
+rm(y)
+```
+
+###data formating
+```{r}
+if(!require(dplyr)){install.packages("dplyr")}
+library(dplyr)
+
+
+sleep_data$date <- as.Date(sleep_data$date, format = "%m/%d")
+sleep_data$bed <-  as.POSIXct(sleep_data$bed, format = "%H:%M") 
+sleep_data$wake_up <-  as.POSIXct(sleep_data$wake_up, format = "%H:%M") 
+
+```
+
+##Sleep Analysis
+```{r}
+sleep_data$hour_of_sleep = 0
+
+for (i in 1:nrow(sleep_data)){
+if (unclass(sleep_data$bed[i]) >= 1515214800 & unclass(sleep_data$bed[i]) <= 1515240000) 
+{sleep_data$hour_of_sleep[i] <- sleep_data$wake_up[i] - sleep_data$bed[i]} else 
+{sleep_data$hour_of_sleep[i] <- sleep_data$wake_up[i] + 86400 - sleep_data$bed[i]}
+}
+rm(i)
+
+sleep_data$hour_of_sleep <- round(sleep_data$hour_of_sleep, digits = 1)
+```
+
+
+**avergae hours of sleep every day**
+```{r}
+mean(sleep_data$hour_of_sleep)
+```
+
+**maximize hours of sleep in a day**
+```{r}
+max(sleep_data$hour_of_sleep)
+```
+
+**minimize hours of sleep in a day**
+```{r}
+min(sleep_data$hour_of_sleep)
+```
+
+variance of hours of sleep every day
+```{r}
+sd(sleep_data$hour_of_sleep)
+```
+
+##visualization 
+```{r}
+sleep_data$bed <- format(sleep_data$bed, format = "%H:%M") %>% as.factor()
+sleep_data$wake_up <- format(sleep_data$wake_up, format = "%H:%M")  %>% as.factor()
+```
+
+
+time for bed (histogram by time)
+```{r}
+bed_time <- append(levels(sleep_data$bed)[17:26], levels(sleep_data$bed)[1:16])
+sleep_data$bed <- factor(sleep_data$bed, levels = bed_time)
+plot(table(sleep_data$bed),xlab = "time for bed (histogram by time)", ylab = "count")
+
+```
+
+
+time to wake up 
+```{r}
+plot(table(sleep_data$wake_up),xlab = "time to wake up (histogram by time)", ylab = "count")
+```
+
+
+hours of sleep 
+```{r}
+hist(sleep_data$hour_of_sleep[sleep_data$hour_of_sleep > 3],freq = TRUE, main = "sleeping hours frequency", ylim = range(0:8), xlab = "hour of sleep")
+```
+
